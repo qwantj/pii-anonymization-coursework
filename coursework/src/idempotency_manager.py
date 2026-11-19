@@ -103,14 +103,19 @@ class IdempotencyVault:
             self._org_cache.clear()
             self._used_substitutions.clear()
 
-    def _generate_unique_name(self, target_gender: str, is_surname: bool) -> str:
-        """Генерация уникального псевдонима с контролем коллизий (KR-COMP-1)."""
+    def _generate_unique_name(
+        self,
+        target_gender: str,
+        is_surname: bool,
+        exclude: Optional[str] = None,
+    ) -> str:
+        """Генерация уникального псевдонима с контролем коллизий и исключением исходного (KR-COMP-1)."""
         for _ in range(50):
-            cand = _pick_random_name(target_gender, is_surname)
+            cand = _pick_random_name(target_gender, is_surname, exclude=exclude)
             if cand not in self._used_substitutions:
                 self._used_substitutions.add(cand)
                 return cand
-        cand = _pick_random_name(target_gender, is_surname)
+        cand = _pick_random_name(target_gender, is_surname, exclude=exclude)
         self._used_substitutions.add(cand)
         return cand
 
@@ -156,9 +161,9 @@ class IdempotencyVault:
                     target_gender = disambiguate_gender_by_context(words[1], text, start, end)
                     self._gender_cache[lemma] = target_gender
 
-                    sur = self._generate_unique_name(target_gender, is_surname=True)
-                    nam = self._generate_unique_name(target_gender, is_surname=False)
-                    pat = _pick_random_patronymic(target_gender)
+                    sur = self._generate_unique_name(target_gender, is_surname=True, exclude=words[0])
+                    nam = self._generate_unique_name(target_gender, is_surname=False, exclude=words[1])
+                    pat = _pick_random_patronymic(target_gender, exclude=words[2])
                     base_full_name = f"{sur} {nam} {pat}"
                     self._name_cache[cache_key] = base_full_name
 
@@ -201,8 +206,10 @@ class IdempotencyVault:
                         target_gender = w0_info["gender"] or w1_info["gender"] or "masc"
 
                     self._gender_cache[lemma] = target_gender
-                    sur = self._generate_unique_name(target_gender, is_surname=True)
-                    nam = self._generate_unique_name(target_gender, is_surname=False)
+                    orig_sur = words[0] if w0_is_surn else words[1]
+                    orig_nam = words[1] if w0_is_surn else words[0]
+                    sur = self._generate_unique_name(target_gender, is_surname=True, exclude=orig_sur)
+                    nam = self._generate_unique_name(target_gender, is_surname=False, exclude=orig_nam)
                     base_full_name = f"{sur} {nam}" if w0_is_surn else f"{nam} {sur}"
                     self._name_cache[cache_key] = base_full_name
 
@@ -235,10 +242,10 @@ class IdempotencyVault:
                     target_gender = self._gender_cache.get(f"{lemma}:{target_gender}", target_gender)
                 else:
                     self._gender_cache[f"{lemma}:{target_gender}"] = target_gender
-                    sur1 = self._generate_unique_name(target_gender, is_surname=True)
-                    sur2 = self._generate_unique_name(target_gender, is_surname=True)
+                    sur1 = self._generate_unique_name(target_gender, is_surname=True, exclude=first_part)
+                    sur2 = self._generate_unique_name(target_gender, is_surname=True, exclude=last_part)
                     while sur2 == sur1:
-                        sur2 = self._generate_unique_name(target_gender, is_surname=True)
+                        sur2 = self._generate_unique_name(target_gender, is_surname=True, exclude=last_part)
                     base_replacement = f"{sur1}-{sur2}"
                     self._name_cache[cache_key] = base_replacement
 
@@ -285,9 +292,9 @@ class IdempotencyVault:
             else:
                 self._gender_cache[normal_form] = target_gender
                 if _is_patronymic(original_word):
-                    base_replacement = _pick_random_patronymic(target_gender)
+                    base_replacement = _pick_random_patronymic(target_gender, exclude=normal_form)
                 else:
-                    base_replacement = self._generate_unique_name(target_gender, is_surname)
+                    base_replacement = self._generate_unique_name(target_gender, is_surname, exclude=normal_form)
                 self._name_cache[cache_key] = base_replacement
 
             cased_info = get_morph_info_for_tag(original_word, entity_tag=tag, target_gender=target_gender)

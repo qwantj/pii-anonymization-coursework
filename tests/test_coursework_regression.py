@@ -19,6 +19,7 @@ from coursework.src.core_pipeline import CourseworkPipeline, EVEN_VARIANT_TAGS, 
 from coursework.src.idempotency_manager import IdempotencyVault
 from lab1.src.hybrid_pipeline import detect_pii
 from lab2.src.anonymizer import _NAMES_F, _NAMES_M, _SURNAMES_F, _SURNAMES_M
+from lab2.src.morph_utils import inflect_word
 
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,10 +78,15 @@ def test_c3_unisex_names_clause_isolation_and_idempotency():
 
     # Нейтральный повтор того же лица сохраняет идемпотентность
     text_idemp = "Саша оплатила госпошлину. Документы Саши готовы."
-    out_idemp, _ = pipe.process(text_idemp, mode="synonymic", vault=IdempotencyVault())
+    vault_idemp = IdempotencyVault()
+    out_idemp, _ = pipe.process(text_idemp, mode="synonymic", vault=vault_idemp)
     rep1 = out_idemp.split()[0]
     rep2 = out_idemp.split()[4]
-    assert rep1[:3].lower() == rep2[:3].lower(), f"Нарушена идемпотентность унисекс-имени: {out_idemp}"
+    assert len(vault_idemp._name_cache) == 1, f"Ожидалась 1 запись в кэше: {vault_idemp._name_cache}"
+    assert rep1.lower() in names_f_low
+    assert inflect_word(rep1, "gent", "femn").lower() == rep2.lower(), (
+        f"Нарушена идемпотентность унисекс-имени: {out_idemp}"
+    )
 
 
 def test_c5_dataset_strictly_10_even_attributes():
@@ -128,14 +134,15 @@ def test_anon_api_signature_and_output_format():
 def test_dative_name_anne_idempotency_and_inflection():
     """Дательный падеж имени 'Анне' в повторном упоминании сохраняет идемпотентность и склоняется."""
     text = "Петрова-Водкина Анна подписала договор. Справка выдана Петровой-Водкиной Анне."
-    out, spans = anon(text)
+    vault = IdempotencyVault()
+    out, spans = anon(text, vault=vault)
     assert [s[0] for s in spans] == ["SURNAME", "NAME", "SURNAME", "NAME"]
     parts = out.replace(".", "").split()
     sur1, name1 = parts[0], parts[1]
     sur2, name2 = parts[6], parts[7]
     assert sur1[:4].lower() == sur2[:4].lower()
-    assert name1[:3].lower() == name2[:3].lower()
-    assert name2.lower() != name1.lower() or name1.lower().endswith(("и", "е"))
+    assert name1.lower() in {n.lower() for n in _NAMES_F}
+    assert inflect_word(name1, "datv", "femn").lower() == name2.lower()
     assert name2.lower().endswith(("е", "и"))
 
 
@@ -152,9 +159,12 @@ def test_mixed_gender_pair_recognition():
 def test_unisex_name_sentence_start_and_oblique_cases():
     """Начало предложения и косвенные падежи двуполых имён распознаются как NAME с единым родом."""
     text = "Женя пришёл вовремя. Документы Жени проверены, Жене выдали пропуск."
-    out, spans = anon(text)
+    vault = IdempotencyVault()
+    out, spans = anon(text, vault=vault)
     assert [s[0] for s in spans] == ["NAME", "NAME", "NAME"]
     words = out.replace(",", "").replace(".", "").split()
     n1, n2, n3 = words[0], words[4], words[6]
+    assert len(vault._name_cache) == 1
     assert n1.lower() in {n.lower() for n in _NAMES_M}
-    assert n1[:3].lower() == n2[:3].lower() == n3[:3].lower()
+    assert inflect_word(n1, "gent", "masc").lower() == n2.lower()
+    assert inflect_word(n1, "datv", "masc").lower() == n3.lower()
