@@ -66,26 +66,26 @@ DEFAULT_TOC_PAGES = {
     "ВВЕДЕНИЕ": 3,
     "1 Аналитический обзор методов деидентификации": 5,
     "1.1 Методы автоматического обнаружения персональных данных": 5,
-    "1.2 Методы обезличивания персональных данных": 7,
-    "1.3 Сравнительный анализ и обоснование архитектурных решений": 9,
-    "2 Проектирование и реализация подсистемы распознавания ПДн": 11,
-    "2.1 Формирование экспериментального датасета и схема разметки BIO": 11,
-    "2.2 Алгоритмические модули валидации контрольных разрядов": 13,
-    "2.3 Модели машинного обучения для извлечения ФИО (logreg и RoSBERTa)": 15,
-    "2.4 Разрешение коллизий спанов и оценка качества Token Classification": 16,
-    "3 Разработка подсистемы синонимического обезличивания": 19,
-    "3.1 Морфологическое согласование и разрешение омонимии падежных форм": 19,
-    "3.2 Контекстное снятие омонимии двуродовых имён и обработка двойных фамилий": 20,
-    "3.3 Алгоритмы обезличивания структурированных атрибутов с сохранением косвенных сведений": 22,
-    "3.4 Обеспечение идемпотентности и случайности замен (IdempotencyVault)": 24,
-    "4 Экспериментальное исследование сохранения семантики (BERTScore)": 26,
-    "4.1 Методология оценки семантической сохранности текста": 26,
-    "4.2 Сравнительный анализ синонимической замены и символьного маскирования": 27,
-    "4.3 Интерпретация результатов и выводы по семантической сохранности": 29,
-    "ЗАКЛЮЧЕНИЕ": 30,
-    "СПИСОК ИСПОЛЬЗОВАННЫХ ИСТОЧНИКОВ": 31,
-    "ПРИЛОЖЕНИЕ А. Контрольные примеры работы программного комплекса": 32,
-    "ПРИЛОЖЕНИЕ Б. Листинги ключевых программных модулей": 34,
+    "1.2 Методы обезличивания персональных данных": 5,
+    "1.3 Сравнительный анализ и обоснование архитектурных решений": 6,
+    "2 Проектирование и реализация подсистемы распознавания ПДн": 7,
+    "2.1 Формирование экспериментального датасета и схема разметки BIO": 7,
+    "2.2 Алгоритмические модули валидации контрольных разрядов": 8,
+    "2.3 Модели машинного обучения для извлечения ФИО (logreg и RoSBERTa)": 9,
+    "2.4 Разрешение коллизий спанов и оценка качества Token Classification": 9,
+    "3 Разработка подсистемы синонимического обезличивания": 11,
+    "3.1 Морфологическое согласование и разрешение омонимии падежных форм": 11,
+    "3.2 Контекстное снятие омонимии двуродовых имён и обработка двойных фамилий": 11,
+    "3.3 Алгоритмы обезличивания структурированных атрибутов": 12,
+    "3.4 Обеспечение идемпотентности и случайности замен (IdempotencyVault)": 13,
+    "4 Экспериментальное исследование семантики (BERTScore)": 15,
+    "4.1 Методология оценки семантической сохранности текста": 15,
+    "4.2 Сравнительный анализ синонимической замены и символьного маскирования": 15,
+    "4.3 Интерпретация результатов и выводы": 16,
+    "ЗАКЛЮЧЕНИЕ": 18,
+    "СПИСОК ИСПОЛЬЗОВАННЫХ ИСТОЧНИКОВ": 19,
+    "ПРИЛОЖЕНИЕ А. Контрольные примеры работы программного комплекса": 21,
+    "ПРИЛОЖЕНИЕ Б. Листинги ключевых программных модулей": 22,
 }
 
 
@@ -487,12 +487,23 @@ def add_code_block(doc: Document, code_str: str):
     return p
 
 
-def _read_snippet(rel_path: str, max_lines: int = 45) -> str:
+def _read_snippet(rel_path: str, start_line: int = 1, end_line: int = 60) -> str:
     fpath = ROOT_DIR / rel_path
     if not fpath.exists():
         return ""
     lines = fpath.read_text(encoding="utf-8").splitlines()
-    return "\n".join(lines[:max_lines])
+    return "\n".join(lines[max(0, start_line - 1):end_line])
+
+
+def add_left_label(doc: Document, text: str, bold: bool = True):
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    p.paragraph_format.first_line_indent = Cm(1.25)
+    p.paragraph_format.space_before = Pt(6)
+    p.paragraph_format.space_after = Pt(4)
+    p.paragraph_format.keep_with_next = True
+    _set_run_font(p.add_run(text), size_pt=14, bold=bold)
+    return p
 
 
 def _get_sources_list() -> list[str]:
@@ -788,9 +799,9 @@ def _add_toc_line(doc: Document, title: str, page_num: int, indent_cm: float = 0
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     p.paragraph_format.first_line_indent = Cm(indent_cm)
-    p.paragraph_format.line_spacing = 1.25
-    p.paragraph_format.space_before = Pt(2)
-    p.paragraph_format.space_after = Pt(2)
+    p.paragraph_format.line_spacing = 1.0
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(0)
     p.paragraph_format.tab_stops.add_tab_stop(Cm(16.5), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
     _set_run_font(p.add_run(f"{title}\t{page_num}"), size_pt=14, bold=bold)
 
@@ -854,12 +865,12 @@ def build_km3_full_docx(out_path=None, metrics_data: dict = None, toc_pages: dic
         ("3 Разработка подсистемы синонимического обезличивания", 0.0, True),
         ("3.1 Морфологическое согласование и разрешение омонимии падежных форм", 0.6, False),
         ("3.2 Контекстное снятие омонимии двуродовых имён и обработка двойных фамилий", 0.6, False),
-        ("3.3 Алгоритмы обезличивания структурированных атрибутов с сохранением косвенных сведений", 0.6, False),
+        ("3.3 Алгоритмы обезличивания структурированных атрибутов", 0.6, False),
         ("3.4 Обеспечение идемпотентности и случайности замен (IdempotencyVault)", 0.6, False),
-        ("4 Экспериментальное исследование сохранения семантики (BERTScore)", 0.0, True),
+        ("4 Экспериментальное исследование семантики (BERTScore)", 0.0, True),
         ("4.1 Методология оценки семантической сохранности текста", 0.6, False),
         ("4.2 Сравнительный анализ синонимической замены и символьного маскирования", 0.6, False),
-        ("4.3 Интерпретация результатов и выводы по семантической сохранности", 0.6, False),
+        ("4.3 Интерпретация результатов и выводы", 0.6, False),
         ("ЗАКЛЮЧЕНИЕ", 0.0, True),
         ("СПИСОК ИСПОЛЬЗОВАННЫХ ИСТОЧНИКОВ", 0.0, True),
         ("ПРИЛОЖЕНИЕ А. Контрольные примеры работы программного комплекса", 0.0, True),
@@ -1031,7 +1042,7 @@ def build_km3_full_docx(out_path=None, metrics_data: dict = None, toc_pages: dic
         "гарантирующая принадлежность каждого токена ровно одному классу ПДн: валидированные ОГРНИП/ИНН/карты "
         "(0,9–1,0) > e-mail и IP (1,5) > нейросетевые и ML-спаны ФИО (2,0) > контекстные шаблоны КЛАДР и "
         "свидетельств ЗАГС (2,5) > паспортные серии (3,0). Оценка качества по схеме Token Classification (BIO) "
-        "вычисляется по формулам (4)–(8):",
+        "вычисляется по формулам (4)–(6):",
     )
     add_formula(doc, "Precision = TP / (TP + FP),   Recall = TP / (TP + FN)", 4)
     add_formula(doc, "F1 = 2 · Precision · Recall / (Precision + Recall)", 5)
@@ -1109,7 +1120,7 @@ def build_km3_full_docx(out_path=None, metrics_data: dict = None, toc_pages: dic
         "2. Двойные дефисные фамилии: ",
     )
 
-    add_heading_2(doc, "3.3 Алгоритмы обезличивания структурированных атрибутов с сохранением косвенных сведений")
+    add_heading_2(doc, "3.3 Алгоритмы обезличивания структурированных атрибутов")
     add_p(
         doc,
         "Генераторы структурированных реквизитов (lab2/src/faker_providers.py) используют криптостойкий ГПСЧ "
@@ -1154,7 +1165,7 @@ def build_km3_full_docx(out_path=None, metrics_data: dict = None, toc_pages: dic
     )
 
     # ГЛАВА 4
-    add_heading_1(doc, "4 Экспериментальное исследование сохранения семантики (BERTScore)", new_page=True)
+    add_heading_1(doc, "4 Экспериментальное исследование семантики (BERTScore)", new_page=True)
     add_heading_2(doc, "4.1 Методология оценки семантической сохранности текста")
     add_p(
         doc,
@@ -1201,7 +1212,7 @@ def build_km3_full_docx(out_path=None, metrics_data: dict = None, toc_pages: dic
     )
     add_figure(doc, bert_png, fig_num=2, caption="Сравнение показателей сохранения семантики (BERTScore)", width_inches=5.5)
 
-    add_heading_2(doc, "4.3 Интерпретация результатов и выводы по семантической сохранности")
+    add_heading_2(doc, "4.3 Интерпретация результатов и выводы")
     add_p(
         doc,
         f"Синонимическое обезличивание достигло F1_BERT = {syn_f1:.4f} (Precision = {syn_p:.4f}, Recall = {syn_r:.4f}), "
@@ -1245,7 +1256,7 @@ def build_km3_full_docx(out_path=None, metrics_data: dict = None, toc_pages: dic
     p_app_a.paragraph_format.space_after = Pt(12)
     _set_run_font(p_app_a.add_run("Контрольные примеры работы программного комплекса"), size_pt=14, bold=True)
 
-    add_p(doc, "Пример 1. Комплексный финансово-договорной документ (сохранение серии паспорта, кода ИФНС ИНН, BIN и последних 4 цифр карты, домена e-mail):")
+    add_left_label(doc, "Пример 1. Комплексный финансово-договорной документ (сохранение серии паспорта, кода ИФНС ИНН, BIN и последних 4 цифр карты, домена e-mail):", bold=False)
     add_code_block(
         doc,
         'Исходный текст:\n'
@@ -1258,7 +1269,7 @@ def build_km3_full_docx(out_path=None, metrics_data: dict = None, toc_pages: dic
         '****** **** (паспорт **** ******, ИНН **********) оплатил картой **** **** **** **** и отправил чек на ************.',
     )
 
-    add_p(doc, "Пример 2. Разрешение омонимии рода и изоляция синтаксических клауз:")
+    add_left_label(doc, "Пример 2. Разрешение омонимии рода и изоляция синтаксических клауз:", bold=False)
     add_code_block(
         doc,
         'Вход:  "Саша пришла в офис, а Женя ушёл домой."\n'
@@ -1267,7 +1278,7 @@ def build_km3_full_docx(out_path=None, metrics_data: dict = None, toc_pages: dic
         'Выход: "Степан пришёл вовремя. Документы Степана проверены, Степану выдали пропуск."',
     )
 
-    add_p(doc, "Пример 3. Идемпотентность склонения двойных фамилий и падежных форм имён:")
+    add_left_label(doc, "Пример 3. Идемпотентность склонения двойных фамилий и падежных форм имён:", bold=False)
     add_code_block(
         doc,
         'Вход:  "Петрова-Водкина Анна подписала договор. Справка выдана Петровой-Водкиной Анне."\n'
@@ -1282,14 +1293,14 @@ def build_km3_full_docx(out_path=None, metrics_data: dict = None, toc_pages: dic
     p_app_b.paragraph_format.space_after = Pt(12)
     _set_run_font(p_app_b.add_run("Листинги ключевых программных модулей"), size_pt=14, bold=True)
 
-    add_p(doc, "Фрагмент Б.1 — Интерфейс CourseworkPipeline и функция anon() (coursework/src/core_pipeline.py):")
-    add_code_block(doc, _read_snippet("coursework/src/core_pipeline.py", max_lines=60))
+    add_left_label(doc, "Фрагмент Б.1 — Интерфейс CourseworkPipeline и функция anon() (coursework/src/core_pipeline.py):", bold=False)
+    add_code_block(doc, _read_snippet("coursework/src/core_pipeline.py", start_line=75, end_line=128))
 
-    add_p(doc, "Фрагмент Б.2 — Контекстное снятие омонимии рода (coursework/src/advanced_morphology.py):")
-    add_code_block(doc, _read_snippet("coursework/src/advanced_morphology.py", max_lines=65))
+    add_left_label(doc, "Фрагмент Б.2 — Контекстное снятие омонимии рода (coursework/src/advanced_morphology.py):", bold=False)
+    add_code_block(doc, _read_snippet("coursework/src/advanced_morphology.py", start_line=35, end_line=89))
 
-    add_p(doc, "Фрагмент Б.3 — Хранилище идемпотентности IdempotencyVault (coursework/src/idempotency_manager.py):")
-    add_code_block(doc, _read_snippet("coursework/src/idempotency_manager.py", max_lines=65))
+    add_left_label(doc, "Фрагмент Б.3 — Хранилище идемпотентности IdempotencyVault (coursework/src/idempotency_manager.py):", bold=False)
+    add_code_block(doc, _read_snippet("coursework/src/idempotency_manager.py", start_line=69, end_line=135))
 
     path = Path(out_path) if out_path else OUT_DIR / "Курсовая_работа_Итоговая_Четный_вариант.docx"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1538,6 +1549,50 @@ $$R_{{BERT}} = \\frac{{\\sum_i IDF(x_i) \\max_j \\cos(e(x_i), e(x'_j))}}{{\\sum_
     print("[OK] Созданы все Markdown отчеты.")
 
 
+def export_docx_to_pdf(docx_path: str | Path) -> Path | None:
+    """Конвертировать DOCX в PDF через docx2pdf или MS Word COM с безопасным fallback."""
+    src = Path(docx_path).resolve()
+    if not src.exists():
+        return None
+    pdf_path = src.with_suffix(".pdf")
+
+    try:
+        from docx2pdf import convert
+        convert(str(src), str(pdf_path))
+        if pdf_path.exists():
+            print(f"[OK] Экспортирован PDF: {pdf_path}")
+            return pdf_path
+    except Exception:
+        pass
+
+    import subprocess
+    ps_script = (
+        "$word = $null; $doc = $null; "
+        "try { "
+        "$word = New-Object -ComObject Word.Application; "
+        "$word.Visible = $false; $word.DisplayAlerts = 0; "
+        f"$doc = $word.Documents.Open('{str(src)}', $false, $true); "
+        f"$doc.ExportAsFixedFormat('{str(pdf_path)}', 17); "
+        "} finally { "
+        "if ($doc -ne $null) { $doc.Close($false) }; "
+        "if ($word -ne $null) { $word.Quit() } "
+        "}"
+    )
+    try:
+        res = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if res.returncode == 0 and pdf_path.exists():
+            print(f"[OK] Экспортирован PDF: {pdf_path}")
+            return pdf_path
+    except Exception:
+        pass
+    return None
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Генератор академических отчетов КМ1, КМ2, КМ3 по ГОСТ 7.32-2017")
     parser.add_argument(
@@ -1552,6 +1607,11 @@ if __name__ == "__main__":
         default=str(OUT_DIR),
         help="Каталог сохранения готовых отчетов",
     )
+    parser.add_argument(
+        "--no-pdf",
+        action="store_true",
+        help="Не экспортировать отчёты в PDF",
+    )
     args = parser.parse_args()
 
     out_directory = Path(args.out_dir)
@@ -1562,8 +1622,11 @@ if __name__ == "__main__":
     print(f"Используемые метрики: Weighted F1 = {metrics['weighted_f1']:.4f}, Macro F1 = {metrics['macro_f1']:.4f} (Источник: {metrics['source']})")
 
     print("\nГенерация полных отчетов по ГОСТ 7.32-2017...")
-    build_km1_docx(out_path=out_directory / "КМ1_отчет_Четный_вариант.docx")
-    build_km2_docx(out_path=out_directory / "КМ2_отчет_Четный_вариант.docx", metrics_data=metrics)
-    build_km3_full_docx(out_path=out_directory / "Курсовая_работа_Итоговая_Четный_вариант.docx", metrics_data=metrics)
+    p_km1 = build_km1_docx(out_path=out_directory / "КМ1_отчет_Четный_вариант.docx")
+    p_km2 = build_km2_docx(out_path=out_directory / "КМ2_отчет_Четный_вариант.docx", metrics_data=metrics)
+    p_km3 = build_km3_full_docx(out_path=out_directory / "Курсовая_работа_Итоговая_Четный_вариант.docx", metrics_data=metrics)
     generate_markdown_reports(out_dir=out_directory, metrics_data=metrics)
+    if not args.no_pdf:
+        for docx_p in (p_km1, p_km2, p_km3):
+            export_docx_to_pdf(docx_p)
     print("\nВсе документы успешно сгенерированы в каталоге:", out_directory)

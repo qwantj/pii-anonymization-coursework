@@ -686,22 +686,52 @@ def build_docx_report(docx_path: str, figures_dir: str, ner_metrics: dict, bert_
 
 
 def convert_to_pdf(docx_path: str) -> Optional[str]:
-    """Автоматическая конвертация .docx в .pdf через docx2pdf с безопасным fallback (KR-COMP-4)."""
+    """
+    Автоматическая конвертация .docx в .pdf через docx2pdf или MS Word COM с безопасным fallback (KR-COMP-4).
+    """
     if not os.path.exists(docx_path):
         return None
 
-    pdf_path = os.path.splitext(docx_path)[0] + ".pdf"
+    abs_docx = os.path.abspath(docx_path)
+    pdf_path = os.path.splitext(abs_docx)[0] + ".pdf"
     try:
         from docx2pdf import convert
-        convert(docx_path, pdf_path)
-        print(f"  [OK] Экспортирован PDF документ: {pdf_path}")
-        return pdf_path
-    except ImportError:
-        print(f"  [INFO] Модуль docx2pdf не установлен. Документ сохранён в формате DOCX: {docx_path}")
-        return None
+        convert(abs_docx, pdf_path)
+        if os.path.exists(pdf_path):
+            print(f"  [OK] Экспортирован PDF документ: {pdf_path}")
+            return pdf_path
+    except Exception:
+        pass
+
+    try:
+        import subprocess
+        ps_script = (
+            "$word = $null; $doc = $null; "
+            "try { "
+            "$word = New-Object -ComObject Word.Application; "
+            "$word.Visible = $false; $word.DisplayAlerts = 0; "
+            f"$doc = $word.Documents.Open('{abs_docx}', $false, $true); "
+            f"$doc.ExportAsFixedFormat('{pdf_path}', 17); "
+            "} finally { "
+            "if ($doc -ne $null) { $doc.Close($false) }; "
+            "if ($word -ne $null) { $word.Quit() } "
+            "}"
+        )
+        res = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if res.returncode == 0 and os.path.exists(pdf_path):
+            print(f"  [OK] Экспортирован PDF документ: {pdf_path}")
+            return pdf_path
     except Exception as e:
         print(f"  [WARN] Ошибка конвертации в PDF ({e}). Документ сохранён в формате DOCX: {docx_path}")
         return None
+
+    print(f"  [INFO] Экспорт в PDF недоступен. Документ сохранён в формате DOCX: {docx_path}")
+    return None
 
 
 def generate_full_report(
