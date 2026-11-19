@@ -258,12 +258,15 @@ def anonymize_email_realistic(original_email: str, current_person_nom: Optional[
         "alex", "dmitry", "elena", "sergey", "anna", "ivan", "olga", "maxim",
         "kirill", "artem", "mikhail", "andrey", "pavel", "marina", "tatiana",
     ]
+    female_first = {"elena", "anna", "olga", "marina", "tatiana"}
     last_names = [
         "smirnov", "kuznetsov", "popov", "ivanov", "vasiliev", "morozov",
         "novikov", "fedorov", "volkov", "alexeev", "lebedev", "semenov",
     ]
     first = _rng.choice(first_names)
     last = _rng.choice(last_names)
+    if first in female_first and not last.endswith("a"):
+        last = last + "a"
     num = _rng.randint(10, 99)
     return f"{first}.{last}{num}@{domain}"
 

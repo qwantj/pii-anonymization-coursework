@@ -15,10 +15,13 @@ import json
 import os
 from collections import Counter
 
-from coursework.src.core_pipeline import CourseworkPipeline, EVEN_VARIANT_TAGS
+from coursework.src.core_pipeline import CourseworkPipeline, EVEN_VARIANT_TAGS, anon
 from coursework.src.idempotency_manager import IdempotencyVault
 from lab1.src.hybrid_pipeline import detect_pii
 from lab2.src.anonymizer import _NAMES_F, _NAMES_M, _SURNAMES_F, _SURNAMES_M
+
+
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def test_c1_female_first_names_not_replaced_by_surnames():
@@ -82,7 +85,7 @@ def test_c3_unisex_names_clause_isolation_and_idempotency():
 
 def test_c5_dataset_strictly_10_even_attributes():
     """C5: Бенчмарк coursework/data/dataset.json строго соответствует 10 атрибутам чётного варианта."""
-    ds_path = os.path.join("coursework", "data", "dataset.json")
+    ds_path = os.path.join(_PROJECT_ROOT, "coursework", "data", "dataset.json")
     assert os.path.exists(ds_path)
     with open(ds_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -110,3 +113,48 @@ def test_c6_collision_resolution_ogrnip_kladr_snils_url():
     t_snils = "СНИЛС 843-373-186 13 принят."
     spans_s = detect_pii(t_snils)
     assert [s[0] for s in spans_s] == ["SNILS"]
+
+
+def test_anon_api_signature_and_output_format():
+    """Проверка высокоуровневой функции anon(text) -> (anonymized_text, spans)."""
+    out, spans = anon("Иван получил кредит")
+    assert isinstance(out, str)
+    assert spans == [["NAME", 0, 4]]
+    rep_name = out.split()[0]
+    assert rep_name != "Иван"
+    assert rep_name.lower() in {n.lower() for n in _NAMES_M}
+
+
+def test_dative_name_anne_idempotency_and_inflection():
+    """Дательный падеж имени 'Анне' в повторном упоминании сохраняет идемпотентность и склоняется."""
+    text = "Петрова-Водкина Анна подписала договор. Справка выдана Петровой-Водкиной Анне."
+    out, spans = anon(text)
+    assert [s[0] for s in spans] == ["SURNAME", "NAME", "SURNAME", "NAME"]
+    parts = out.replace(".", "").split()
+    sur1, name1 = parts[0], parts[1]
+    sur2, name2 = parts[6], parts[7]
+    assert sur1[:4].lower() == sur2[:4].lower()
+    assert name1[:3].lower() == name2[:3].lower()
+    assert name2.lower() != name1.lower() or name1.lower().endswith(("и", "е"))
+    assert name2.lower().endswith(("е", "и"))
+
+
+def test_mixed_gender_pair_recognition():
+    """Распознавание NAME в паре 'Иванов Пётр и Иванова Анна подписали договор.'."""
+    text = "Иванов Пётр и Иванова Анна подписали договор."
+    out, spans = anon(text)
+    assert [s[0] for s in spans] == ["SURNAME", "NAME", "SURNAME", "NAME"]
+    tokens = out.split()
+    assert tokens[1].lower() in {n.lower() for n in _NAMES_M}
+    assert tokens[4].lower() in {n.lower() for n in _NAMES_F}
+
+
+def test_unisex_name_sentence_start_and_oblique_cases():
+    """Начало предложения и косвенные падежи двуполых имён распознаются как NAME с единым родом."""
+    text = "Женя пришёл вовремя. Документы Жени проверены, Жене выдали пропуск."
+    out, spans = anon(text)
+    assert [s[0] for s in spans] == ["NAME", "NAME", "NAME"]
+    words = out.replace(",", "").replace(".", "").split()
+    n1, n2, n3 = words[0], words[4], words[6]
+    assert n1.lower() in {n.lower() for n in _NAMES_M}
+    assert n1[:3].lower() == n2[:3].lower() == n3[:3].lower()

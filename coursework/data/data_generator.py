@@ -63,10 +63,15 @@ def _load_factrueval_testset_samples(limit: int = 45) -> list[dict]:
     test_dir = os.path.join(
         PROJECT_ROOT, "lab1", "data", "factRuEval", "factRuEval-2016-master", "testset"
     )
-    if not os.path.isdir(test_dir):
-        return []
-    from lab1.src.ner.train_ner_model import extract_clean_factrueval_sentences
-    return extract_clean_factrueval_sentences(test_dir, limit=limit)
+    if os.path.isdir(test_dir):
+        from lab1.src.ner.train_ner_model import extract_clean_factrueval_sentences
+        return extract_clean_factrueval_sentences(test_dir, limit=limit)
+
+    fallback_json = os.path.join(os.path.dirname(__file__), "factrueval_testset_45.json")
+    if os.path.exists(fallback_json):
+        with open(fallback_json, "r", encoding="utf-8") as f:
+            return json.load(f)[:limit]
+    return []
 
 
 def generate_coursework_dataset(output_path: str, min_per_attr: int = 60) -> list[dict]:

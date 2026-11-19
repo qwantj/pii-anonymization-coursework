@@ -33,6 +33,31 @@ DEFAULT_MODEL_PATH = _CW_MODEL_PATH if os.path.exists(_CW_MODEL_PATH) else _LAB1
 _HYPHEN_RIGHT_RE = re.compile(r'^-[А-ЯЁA-Z][а-яёa-z]{1,}(?:-[А-ЯЁA-Z][а-яёa-z]{1,})*')
 _HYPHEN_LEFT_RE = re.compile(r'(?:^|(?<=[\s«"(\[.,;:]))([А-ЯЁA-Z][а-яёa-z]{1,}(?:-[А-ЯЁA-Z][а-яёa-z]{1,})*)-$')
 
+_SURNAME_SUFFIXES = (
+    "ов", "ова", "ев", "ева", "ёв", "ёва", "ин", "ина", "ын", "ына",
+    "ский", "ская", "цкий", "цкая", "ых", "их", "ко", "чук", "юк", "енко",
+)
+_AMBIGUOUS_NAMES = {
+    "саша", "женя", "валя", "слава", "лена", "паша", "миша", "ярослава",
+    "ваня", "тоня", "шура", "даня", "алекса",
+}
+_NAME_CONTEXT_WORDS = {
+    "документы", "справка", "заявитель", "клиент", "гражданин", "гражданка",
+    "у", "для", "от", "к",
+}
+_KNOWN_NAMES_CACHE: set[str] | None = None
+
+
+def _get_known_names() -> set[str]:
+    """Лениво собрать множество известных русских имён в нижнем регистре."""
+    global _KNOWN_NAMES_CACHE
+    if _KNOWN_NAMES_CACHE is None:
+        from lab2.src.anonymizer import _NAMES_M, _NAMES_F
+        names = {n.lower().replace("ё", "е") for n in (_NAMES_M + _NAMES_F)}
+        names.update(n.replace("ё", "е") for n in _AMBIGUOUS_NAMES)
+        _KNOWN_NAMES_CACHE = names
+    return _KNOWN_NAMES_CACHE
+
 
 class TrainedTokenClassifierDetector:
     """Детектор сущностей на базе обученной AI-модели токенной классификации."""
@@ -102,6 +127,78 @@ class TrainedTokenClassifierDetector:
 
         return deduped
 
+    @staticmethod
+    def _refine_surname_name_tags(
+        text: str,
+        tokens_spans: list[tuple[str, int, int]],
+        entities: list[tuple[str, int, int]],
+    ) -> list[tuple[str, int, int]]:
+        """Пост-коррекция тегов SURNAME/NAME и пропущенных унисекс-имён по морфологии."""
+        from lab2.src.morphology_engine import MorphologyEngine
+
+        morph = MorphologyEngine.get_analyzer()
+        known_names = _get_known_names()
+
+        refined: list[tuple[str, int, int]] = []
+        for tag, start, end in entities:
+            span_text = text[start:end]
+            if "-" not in span_text and tag in ("SURNAME", "NAME"):
+                parses = morph.parse(span_text)
+                has_surn = any(p.is_known and "Surn" in p.tag for p in parses)
+                has_name = any(p.is_known and "Name" in p.tag for p in parses)
+                non_fixd_lemmas = {
+                    p.normal_form.lower().replace("ё", "е")
+                    for p in parses
+                    if p.is_known and "Fixd" not in p.tag
+                }
+                in_known = bool(non_fixd_lemmas & known_names) or (
+                    span_text.lower().replace("ё", "е") in known_names
+                )
+                low = span_text.lower()
+
+                if tag == "SURNAME" and not low.endswith(_SURNAME_SUFFIXES) and not has_surn and (has_name or in_known):
+                    tag = "NAME"
+                elif tag == "NAME" and not in_known and has_surn and not has_name:
+                    tag = "SURNAME"
+
+            refined.append((tag, start, end))
+
+        surname_ranges = [(s, e) for t, s, e in refined if t == "SURNAME"]
+
+        def _is_covered(s: int, e: int) -> bool:
+            return any(max(s, es) < min(e, ee) for _, es, ee in refined)
+
+        def _is_surname_span(s: int, e: int) -> bool:
+            return any(max(s, ss) < min(e, se) for ss, se in surname_ranges)
+
+        def _is_trigger_neighbor(tok_idx: int) -> bool:
+            if tok_idx < 0 or tok_idx >= len(tokens_spans):
+                return False
+            nb_word, nb_s, nb_e = tokens_spans[tok_idx]
+            if _is_surname_span(nb_s, nb_e):
+                return True
+            if nb_word.lower() in _NAME_CONTEXT_WORDS:
+                return True
+            nb_parses = morph.parse(nb_word)
+            return bool(nb_parses and "VERB" in nb_parses[0].tag and "past" in nb_parses[0].tag)
+
+        for idx, (word, t_start, t_end) in enumerate(tokens_spans):
+            if not word or not word[0].isupper() or not word.isalpha():
+                continue
+            if _is_covered(t_start, t_end):
+                continue
+
+            parses = morph.parse(word)
+            is_ambig_name = any(
+                "Name" in p.tag and p.normal_form.lower() in _AMBIGUOUS_NAMES
+                for p in parses
+            )
+            if is_ambig_name and (_is_trigger_neighbor(idx - 1) or _is_trigger_neighbor(idx + 1)):
+                refined.append(("NAME", t_start, t_end))
+
+        refined.sort(key=lambda s: s[1])
+        return refined
+
     def detect(self, text: str) -> list[tuple[str, int, int]]:
         """
         Предсказать именованные сущности (SURNAME, NAME) в тексте.
@@ -153,4 +250,5 @@ class TrainedTokenClassifierDetector:
         if current_tag is not None:
             entities.append((current_tag, current_start, current_end))
 
+        entities = self._refine_surname_name_tags(text, tokens_spans, entities)
         return self._stitch_hyphenated_entities(text, entities)

@@ -45,6 +45,19 @@ def get_morph_info_cached(word: str) -> Dict[str, Any]:
         }
 
     best = parsed[0]
+    if ("Fixd" in best.tag or "plur" in best.tag) and any("Name" in p.tag or "Surn" in p.tag for p in parsed):
+        preferred = [
+            p for p in parsed
+            if ("Name" in p.tag or "Surn" in p.tag) and "Fixd" not in p.tag and "sing" in p.tag
+        ]
+        if not preferred:
+            preferred = [
+                p for p in parsed
+                if ("Name" in p.tag or "Surn" in p.tag) and "Fixd" not in p.tag
+            ]
+        if preferred:
+            best = preferred[0]
+
     if word.lower().endswith(("у", "ю")):
         for p in parsed:
             if "Surn" in p.tag and "datv" in p.tag and "masc" in p.tag:
@@ -133,7 +146,7 @@ def get_morph_info_for_tag(
         return get_morph_info_cached(word)
 
     # Приоритетная оценка каждого разбора по тегу сущности и роду
-    def _score_parse(p) -> tuple[int, int, int]:
+    def _score_parse(p) -> tuple[int, int, int, int, int]:
         t = p.tag
         tag_match = 0
         if entity_tag == "SURNAME" and "Surn" in t:
@@ -145,13 +158,15 @@ def get_morph_info_for_tag(
         elif "NOUN" in t or "ADJF" in t:
             tag_match = 1
 
+        not_fixd_bonus = 1 if "Fixd" not in t else 0
         gender_match = 1 if (target_gender and target_gender in t) else 0
+        sing_bonus = 1 if "sing" in t else 0
         nomn_bonus = 1 if (target_gender == "femn" and "nomn" in t and word.lower().endswith(("а", "я"))) else 0
-        return (tag_match, gender_match, nomn_bonus)
+        return (tag_match, not_fixd_bonus, gender_match, sing_bonus, nomn_bonus)
 
     best = max(parsed, key=_score_parse)
     # Если ни один специфичный тег не совпал и род не задан, используем стандартный разбор
-    if _score_parse(best) == (0, 0, 0):
+    if _score_parse(best)[:1] == (0,) and not target_gender:
         return get_morph_info_cached(word)
 
     # Если целевой род не задан, но выбрали по тегу (например, NAME для 'Жени'),

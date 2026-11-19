@@ -106,3 +106,23 @@ class CourseworkPipeline:
         anonymized_text = strategy.execute(text, spans, vault=vault)
 
         return anonymized_text, spans
+
+
+_DEFAULT_ANON_PIPELINE: Optional[CourseworkPipeline] = None
+
+
+def anon(
+    text: str,
+    mode: str = "synonymic",
+    vault: Optional[IdempotencyVault] = None,
+) -> Tuple[str, List[Any]]:
+    """
+    Высокоуровневая функция распознавания и синонимического обезличивания ПДн.
+
+    Пример:
+        anon("Иван получил кредит") -> ("Пётр получил кредит", [["NAME", 0, 4]])
+    """
+    global _DEFAULT_ANON_PIPELINE
+    if _DEFAULT_ANON_PIPELINE is None:
+        _DEFAULT_ANON_PIPELINE = CourseworkPipeline(detector_type="logreg")
+    return _DEFAULT_ANON_PIPELINE.process(text, mode=mode, vault=vault)
