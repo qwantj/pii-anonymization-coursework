@@ -5,7 +5,6 @@
 2. Отсутствие InconsistentVersionWarning при десериализации joblib.
 3. Высокую полноту (Recall = 1.0), приоритет EMAIL (1.5), поддержку Punycode, валидацию Lookbehind и санитизацию mailto:.
 4. Достижение нормативных метрик Weighted F1 >= 0.85 и Macro F1 >= 0.80 (целевой >= 0.92).
-5. Консистентность данных между файлами отчетов report.md, report.docx и академическими пакетами КМ1–КМ3.
 """
 
 import os
@@ -14,7 +13,6 @@ import json
 import warnings
 import joblib
 import pytest
-from docx import Document
 
 from lab1.src.ner.rosberta_detector import RoSBERTaNerDetector
 from lab1.src.hybrid_pipeline import detect_pii, HybridDetector
@@ -183,76 +181,3 @@ class TestAuditRemediation:
         assert metrics["per_class"]["EMAIL"]["recall"] >= 0.90, "Recall EMAIL ниже норматива 0.90!"
         assert metrics["per_class"]["SURNAME"]["f1"] >= 0.85, "F1 SURNAME ниже норматива 0.85!"
         assert metrics["per_class"]["NAME"]["f1"] >= 0.85, "F1 NAME ниже норматива 0.85!"
-
-    def test_items2_and_5_reports_generation_and_cross_consistency(self):
-        """Пункты 2 и 5: Проверка динамических статусов и согласованности метрик во всех отчетах."""
-        artifacts_path = "coursework/report/evaluation_artifacts.json"
-        assert os.path.exists(artifacts_path), "Файл артефактов evaluation_artifacts.json отсутствует!"
-        
-        with open(artifacts_path, "r", encoding="utf-8") as f:
-            art = json.load(f)
-            
-        macro_f1 = art["token_classification"]["macro_f1"]
-        weighted_f1 = art["token_classification"]["weighted_f1"]
-        w_f1_str = f"{weighted_f1:.4f}"
-        m_f1_str = f"{macro_f1:.4f}"
-        
-        # 1. Проверка report.md на отсутствие ложных записей "ВЫПОЛНЕНО"
-        with open("coursework/report/report.md", "r", encoding="utf-8") as f:
-            md_content = f.read()
-        if macro_f1 < 0.80:
-            assert "Macro F1" in md_content and "НЕ ВЫПОЛНЕНО" in md_content
-        else:
-            assert "Macro F1" in md_content and "ВЫПОЛНЕНО" in md_content
-            
-        # 2. Проверка валидности DOCX документов и наличия таблиц/параграфов
-        docs_dir = "docs" if os.path.isdir("docs") else "готовые_отчеты"
-        docx_files = [
-            "coursework/report/report.docx",
-            f"{docs_dir}/КМ1_отчет_Четный_вариант.docx",
-            f"{docs_dir}/КМ2_отчет_Четный_вариант.docx",
-            f"{docs_dir}/Курсовая_работа_Итоговая_Четный_вариант.docx",
-        ]
-        for fname in docx_files:
-            assert os.path.exists(fname), f"Отчет {fname} не сформирован!"
-            doc = Document(fname)
-            assert len(doc.paragraphs) > 20, f"Отчет {fname} имеет аномально малый объем!"
-            assert len(doc.tables) >= 1, f"В отчете {fname} отсутствуют таблицы!"
-
-        # 3. Кросс-документная сверка значений метрик F1 между отчетами и evaluation_artifacts.json
-        assert w_f1_str in md_content, f"Weighted F1 {w_f1_str} not in report.md"
-        assert m_f1_str in md_content, f"Macro F1 {m_f1_str} not in report.md"
-
-        # Проверка report.docx
-        doc_cw = Document("coursework/report/report.docx")
-        text_cw = " ".join(p.text for p in doc_cw.paragraphs) + " " + " ".join(
-            c.text for t in doc_cw.tables for r in t.rows for c in r.cells
-        )
-        assert w_f1_str in text_cw, f"Weighted F1 {w_f1_str} not in report.docx"
-        assert m_f1_str in text_cw, f"Macro F1 {m_f1_str} not in report.docx"
-
-        # Проверка КМ2
-        with open(f"{docs_dir}/КМ2_отчет_Четный_вариант.md", "r", encoding="utf-8") as f:
-            md_km2 = f.read()
-        assert w_f1_str in md_km2, f"Weighted F1 {w_f1_str} not in KM2 md"
-        assert m_f1_str in md_km2, f"Macro F1 {m_f1_str} not in KM2 md"
-
-        doc_km2 = Document(f"{docs_dir}/КМ2_отчет_Четный_вариант.docx")
-        text_km2 = " ".join(p.text for p in doc_km2.paragraphs) + " " + " ".join(
-            c.text for t in doc_km2.tables for r in t.rows for c in r.cells
-        )
-        assert w_f1_str in text_km2, f"Weighted F1 {w_f1_str} not in KM2 docx"
-        assert m_f1_str in text_km2, f"Macro F1 {m_f1_str} not in KM2 docx"
-
-        # Проверка КМ3
-        with open(f"{docs_dir}/Курсовая_работа_Итоговая_Четный_вариант.md", "r", encoding="utf-8") as f:
-            md_km3 = f.read()
-        assert w_f1_str in md_km3, f"Weighted F1 {w_f1_str} not in KM3 md"
-        assert m_f1_str in md_km3, f"Macro F1 {m_f1_str} not in KM3 md"
-
-        doc_km3 = Document(f"{docs_dir}/Курсовая_работа_Итоговая_Четный_вариант.docx")
-        text_km3 = " ".join(p.text for p in doc_km3.paragraphs) + " " + " ".join(
-            c.text for t in doc_km3.tables for r in t.rows for c in r.cells
-        )
-        assert w_f1_str in text_km3, f"Weighted F1 {w_f1_str} not in KM3 docx"
-        assert m_f1_str in text_km3, f"Macro F1 {m_f1_str} not in KM3 docx"

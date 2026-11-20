@@ -90,7 +90,7 @@ pip install -r requirements.txt
 ### Основные команды
 
 ```bash
-# 1. Полный цикл: оценка F1, обезличивание, расчёт BERTScore, генерация графиков и отчёта
+# 1. Полный цикл: оценка F1, обезличивание, расчёт BERTScore
 python coursework/run_coursework.py
 
 # 2. Специализированные проверки (идемпотентность, двуполые имена, двойные фамилии, омонимия)
@@ -99,10 +99,7 @@ python coursework/run_coursework.py --tests
 # 3. Интерактивный демонстрационный режим
 python coursework/run_coursework.py --demo
 
-# 4. Пересборка академических отчётов КМ-1, КМ-2 и КМ-3 по ГОСТ 7.32-2017
-python build_all_coursework_reports.py
-
-# 5. Запуск всех автотестов
+# 4. Запуск всех автотестов
 pytest
 ```
 
@@ -133,7 +130,6 @@ python coursework/run_coursework.py --detector onnx --onnx
 ├── requirements.txt
 ├── pytest.ini
 ├── conftest.py
-├── build_all_coursework_reports.py        # Генератор академических отчётов КМ1–КМ3
 ├── coursework/
 │   ├── run_coursework.py                  # Главная точка входа КР
 │   ├── ИНСТРУКЦИЯ_КР.md
@@ -147,10 +143,7 @@ python coursework/run_coursework.py --detector onnx --onnx
 │   │   ├── f1_evaluator.py                # Token Classification (BIO) оценка
 │   │   └── bert_score_evaluator.py        # Пакетный расчёт BERTScore с IDF
 │   ├── report/
-│   │   ├── build_report.py
-│   │   ├── evaluation_artifacts.json
-│   │   ├── report.md / report.docx
-│   │   └── figures/                       # Графики f1_per_class.png, bertscore_comparison.png
+│   │   └── evaluation_artifacts.json      # Метрики F1 и BERTScore последнего прогона
 │   └── src/                               # Ядро пайплайна, стратегии, IdempotencyVault, морфология
 ├── lab1/src/                              # Правила, валидаторы контрольных сумм, NER-детекторы
 ├── lab2/src/                              # Морфологический движок pymorphy3 и генераторы замен
@@ -158,6 +151,5 @@ python coursework/run_coursework.py --detector onnx --onnx
 ├── training/                              # Скрипты обучения RoSBERTa и экспорта ONNX
 ├── scripts/
 │   └── download_models.py                 # Загрузка весов RoSBERTa INT8 ONNX из Releases
-├── docs/                                  # Отчёты КМ1, КМ2 и итоговая КР (.docx и .md)
 └── tests/                                 # Автотесты (300+ тестов)
 ```

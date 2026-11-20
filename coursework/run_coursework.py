@@ -3,10 +3,10 @@
 обезличивания персональных данных с оценкой BERTScore и генерацией отчета.
 
 Запуск:
-    python run_coursework.py             # Полный цикл: бенчмарк + метрики + BERTScore + генерация report.docx
+    python run_coursework.py             # Полный цикл: бенчмарк + метрики + BERTScore + сохранение метрик в JSON
     python run_coursework.py --demo      # Интерактивное тестирование
     python run_coursework.py --tests     # Запуск специализированных проверок
-    python run_coursework.py --detector=rosberta --report-type=full_package --export-pdf  # Полный академический комплект
+    python run_coursework.py --detector=rosberta  # Полный цикл с нейросетевым детектором
 """
 
 import argparse
@@ -24,7 +24,7 @@ from coursework.src.core_pipeline import CourseworkPipeline
 from coursework.src.idempotency_manager import IdempotencyVault
 from coursework.evaluation.f1_evaluator import evaluate_dataset
 from coursework.evaluation.bert_score_evaluator import evaluate_bertscore_comparison
-from coursework.report.build_report import generate_full_report, save_evaluation_artifacts
+from coursework.evaluation.artifacts import save_evaluation_artifacts
 
 
 def run_full_pipeline(
@@ -32,8 +32,6 @@ def run_full_pipeline(
     report_dir: str,
     use_onnx: bool = False,
     detector_type: str = "logreg",
-    report_type: str = "summary",
-    export_pdf: bool = False,
 ):
     print("=" * 80)
     print("КУРСОВАЯ РАБОТА: СКВОЗНОЙ ПАЙПЛАЙН (ЧЁТНЫЙ ВАРИАНТ)")
@@ -143,19 +141,9 @@ def run_full_pipeline(
         }
     )
 
-    # 6. Генерация отчета и экспорт в PDF (KR-COMP-4)
-    print(f"\n[Этап 5] Формирование отчета (режим '{report_type}', экспорт PDF={export_pdf})...")
-    generate_full_report(
-        report_dir=report_dir,
-        ner_metrics=ner_metrics,
-        bert_metrics=bert_metrics,
-        report_type=report_type,
-        export_pdf=export_pdf,
-    )
-
     print("\n" + "=" * 80)
     print("КУРСОВАЯ РАБОТА УСПЕШНО ВЫПОЛНЕНА!")
-    print(f"Файл отчета: {os.path.join(report_dir, 'report.docx')}")
+    print(f"Артефакты оценки: {artifacts_path}")
     print("=" * 80)
 
 
@@ -229,9 +217,6 @@ def main():
     parser.add_argument("--tests", action="store_true", help="Запуск специализированных проверок")
     parser.add_argument("--detector", type=str, default="logreg", choices=["logreg", "rosberta", "onnx", "rubert", "auto"],
                         help="Выбор бэкенда детектора (KR-ARC-1)")
-    parser.add_argument("--report-type", type=str, default="summary", choices=["summary", "km1", "km2", "km3", "full_package"],
-                        help="Тип генерируемой академической отчетности (KR-COMP-4)")
-    parser.add_argument("--export-pdf", action="store_true", help="Экспортировать отчет в формат PDF (KR-COMP-4)")
     parser.add_argument("--onnx", "--quantized", dest="onnx", action="store_true", default=False,
                         help="Использовать квантованную модель (INT8 ONNX, быстрый CPU инференс)")
     parser.add_argument("--pytorch", dest="onnx", action="store_false",
@@ -256,8 +241,6 @@ def main():
             report_dir=report_dir,
             use_onnx=args.onnx,
             detector_type=args.detector,
-            report_type=args.report_type,
-            export_pdf=args.export_pdf,
         )
 
 

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Тестовый набор Спринта 4: Полнота решений, энтропия генерации и академическая валидация.
 
 Покрывает:
@@ -7,7 +7,6 @@
 3. LR-COMP-3: Реалистичные структуры email и расширенные пулы организаций/топонимов.
 4. LR-COMP-4: Модуль автоматизированного аудита качества деидентификации (DeidentificationAuditor).
 5. KR-COMP-3: Адаптивное предикативное согласование зависимых глаголов и причастий (PredicateAgreementRepair).
-6. KR-COMP-4: Сквозная академическая отчетность (КМ1-КМ3) и фасад генерации.
 7. LR-ARC-1: Реестр провайдеров Strategy и безопасное fallback-маскирование неизвестных тегов.
 8. KR-ARC-2: Персистентность сессий, управление жизненным циклом и экспорт карты замен IdempotencyVault.
 9. KR-ARC-3: Стратегии обезличивания в конвейере (Synonymic, Masking, HMAC).
@@ -51,7 +50,6 @@ from coursework.evaluation.bert_score_evaluator import (
     compute_bertscore_analytical,
     evaluate_bertscore_comparison,
 )
-from coursework.report.build_report import generate_full_report
 
 
 # ============================================================================
@@ -312,37 +310,3 @@ class TestKRCOMP2CanonicalIDFWeighting:
         assert res["synonymic"]["f1"] > res["masked"]["f1"]
 
 
-# ============================================================================
-# 11. ТЕСТЫ KR-COMP-4: Генерация академической отчетности
-# ============================================================================
-class TestKRCOMP4AcademicReporting:
-    """Тестирование формирования отчетов КМ1-КМ3 и фасада generate_full_report."""
-
-    def test_generate_full_report_summary(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            ner_metrics = {
-                "per_class": {
-                    "PER": {"precision": 0.95, "recall": 0.94, "f1": 0.945, "support": 50},
-                    "INN": {"precision": 1.0, "recall": 1.0, "f1": 1.0, "support": 40},
-                },
-                "weighted_f1": 0.965,
-                "macro_f1": 0.972,
-                "overall": {"precision": 0.97, "recall": 0.96, "f1": 0.965},
-            }
-            bert_metrics = {
-                "synonymic": {"precision": 0.98, "recall": 0.98, "f1": 0.98},
-                "masked": {"precision": 0.94, "recall": 0.91, "f1": 0.925},
-                "delta_f1": 0.055,
-            }
-            generate_full_report(
-                report_dir=tmp_dir,
-                ner_metrics=ner_metrics,
-                bert_metrics=bert_metrics,
-                report_type="summary",
-                export_pdf=False,
-            )
-
-            docx_file = os.path.join(tmp_dir, "report.docx")
-            md_file = os.path.join(tmp_dir, "report.md")
-            assert os.path.exists(docx_file), "report.docx должен быть создан"
-            assert os.path.exists(md_file), "report.md должен быть создан"
